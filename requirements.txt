@@ -1,5 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 streamlit==1.59.1
 ultralytics==8.4.92
-torch==2.13.0
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu
 Pillow>=11.0,<13
 requests>=2.32,<3

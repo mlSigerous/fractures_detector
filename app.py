@@ -11,15 +11,15 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from inference import FractureDetector, InferenceResult
 
-
 APP_ROOT = Path(__file__).resolve().parent
 MAX_FILE_SIZE = 20 * 1024 * 1024
 MAX_MODEL_SIZE = 1024 * 1024 * 1024
+MODEL_MAP50 = 0.2058
 Image.MAX_IMAGE_PIXELS = 50_000_000
 
 
 def get_setting(name: str) -> str | None:
-    """Читает настройку из окружения или Streamlit Secrets."""
+    """Читает настройку из окружения или Streamlit Secrets"""
     if value := os.getenv(name):
         return value
     try:
@@ -30,7 +30,7 @@ def get_setting(name: str) -> str | None:
 
 
 def find_local_model() -> Path | None:
-    """Ищет веса в местах, используемых training notebook и приложением."""
+    """Ищет веса в местах, используемых training notebook и приложением"""
     candidates = []
     if configured_path := get_setting("MODEL_PATH"):
         candidates.append(Path(configured_path).expanduser())
@@ -47,7 +47,7 @@ def find_local_model() -> Path | None:
 
 @st.cache_resource(show_spinner="Загружаем веса модели…")
 def download_model(model_url: str) -> Path:
-    """Один раз скачивает публичный .pt-файл во временное хранилище."""
+    """Один раз скачивает публичный .pt-файл во временное хранилище"""
     cache_dir = Path("/tmp/fracture_detector")
     cache_dir.mkdir(parents=True, exist_ok=True)
     url_hash = hashlib.sha256(model_url.encode()).hexdigest()[:12]
@@ -82,7 +82,7 @@ def download_model(model_url: str) -> Path:
 
     if downloaded_size < 1_000_000:
         temporary_path.unlink(missing_ok=True)
-        raise ValueError("Скачанный файл слишком мал и не похож на веса модели")
+        raise ValueError("Скачанный файл не похож на веса модели")
 
     temporary_path.replace(download_path)
     return download_path
@@ -162,28 +162,37 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Детектор переломов по рентгеновскому снимку")
+st.title("Учебный детектор переломов")
 st.write(
     "Загрузите рентген в формате JPG, PNG или WEBP. "
     "Модель отметит области с возможными признаками перелома."
 )
 st.caption("Загруженные снимки не сохраняются приложением на диск.")
 
-with st.expander("Важная информация", expanded=False):
+status_column, metric_column = st.columns(2)
+with status_column:
+    st.metric("Статус", "Учебный прототип")
+with metric_column:
+    st.metric("Test mAP@0.5", f"{MODEL_MAP50:.3f}")
+
+st.warning(
+    "Качество модели ограничено: она может как пропустить перелом, так и "
+    "отметить здоровую область. Не используй результат для медицинских решений."
+)
+
+with st.expander("О модели и ограничениях", expanded=False):
     st.markdown(
-        "Приложение предназначено для учебных и исследовательских целей. "
-        "Результат модели не является медицинским диагнозом и не заменяет "
-        "заключение квалифицированного специалиста."
+        "Приложение является учебным проектом"
+        "Указанный `mAP@0.5 = 0.206` получен на тестовой части исходного "
+        "рентгеновского датасета и не является показателем диагностической "
+        "точности. Результат модели не является медицинским диагнозом"
     )
 
 try:
     model_path = resolve_model_path()
 except (FileNotFoundError, RuntimeError, ValueError) as error:
     st.error(f"Модель пока недоступна: {error}")
-    st.info(
-        "Положите веса в `models/fracture_detector_best.pt` либо задайте "
-        "публичную прямую ссылку `MODEL_URL` в Streamlit Secrets."
-    )
+    st.info("Нет весов в репозитории")
     st.stop()
 
 confidence = st.slider(
@@ -192,7 +201,7 @@ confidence = st.slider(
     max_value=0.90,
     value=0.25,
     step=0.05,
-    help="Чем ниже значение, тем больше подозрительных областей покажет модель.",
+    help="Чем ниже значение, тем больше подозрительных областей покажет модель",
 )
 uploaded_file = st.file_uploader(
     "Рентгеновский снимок",

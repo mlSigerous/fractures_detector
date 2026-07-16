@@ -65,8 +65,7 @@ class FractureDetector:
         image = image.convert("RGB")
         started_at = perf_counter()
 
-        # Кешированная модель общая для сессий Streamlit. Lock не даёт двум
-        # пользователям одновременно менять внутреннее состояние predictor.
+        # Кешированная модель для стримлита
         with self._lock:
             prediction = self._model.predict(
                 source=image,
