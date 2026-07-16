@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.streamlit/secrets.toml
+.venv/
+data/
+fracture_detector/
+models/*.zip
